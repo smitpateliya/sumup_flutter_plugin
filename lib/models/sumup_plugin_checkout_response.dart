@@ -82,21 +82,19 @@ class SumupPluginCheckoutResponse {
   /// **Android only**
   String? foreignTransactionId;
 
-  /// Merchant code associated with the transaction (Android Tap-to-Pay).
+  /// Merchant code associated with the transaction.
   String? merchantCode;
 
-  /// Card scheme (e.g. VISA, MASTERCARD) (Android Tap-to-Pay).
+  /// Card scheme (e.g. VISA, MASTERCARD).
   String? cardScheme;
 
   /// True when the user closed the success screen (e.g. back arrow) instead of Done/Send receipt.
   bool? userDismissedSuccessScreen;
 
-  /// Error message when [success] is false (e.g. "Transaction canceled", "Tap-to-Pay init failed").
+  /// Error message when [success] is false.
   String? errors;
 
   /// Products included in the transaction.
-  ///
-  /// Available on iOS and Android (card reader only; not available for Tap-to-Pay).
   List<SumupProduct>? products;
 
   String toString() {

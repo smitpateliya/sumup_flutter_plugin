@@ -21,11 +21,6 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.UUID
 
 
@@ -39,11 +34,6 @@ class SumupPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
     private lateinit var affiliateKey: String
     private lateinit var channel: MethodChannel
     private lateinit var activity: Activity
-
-    /** Stored token for Tap-to-Pay SDK (set when loginWithToken is called). */
-    private var ttpAccessToken: String? = null
-
-    private val pluginScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         Log.d(tag, "Sumup plugin: engine attached.")
@@ -97,19 +87,16 @@ class SumupPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
             "checkout" -> {
                 val args = call.arguments as? Map<String, Any?> ?: emptyMap()
                 val payment = args["payment"] as? Map<String, Any?>
-                val paymentMethod = (args["paymentMethod"] as? String) ?: "cardReader"
                 val info = args["info"] as? Map<String, String>
                 if (payment == null) {
                     result.success(SumupPluginResponse("checkout").apply { status = false; message = mutableMapOf("errors" to "payment is required") }.toMap())
                 } else {
-                    checkout(payment, paymentMethod, info, result)
+                    checkout(payment, info)
                 }
             }
             "isCheckoutInProgress" -> isCheckoutInProgress().flutterResult()
             "isTipOnCardReaderAvailable" -> isTipOnCardReaderAvailable().flutterResult()
             "isCardTypeRequired" -> isCardTypeRequired().flutterResult()
-            "checkTapToPayAvailability" -> checkTapToPayAvailability(result)
-            "presentTapToPayActivation" -> presentTapToPayActivation(result)
             "logout" -> logout(result)
             else -> result.notImplemented()
         }
@@ -135,7 +122,6 @@ class SumupPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
     }
 
     private fun loginWithToken(@NonNull token: String) {
-        ttpAccessToken = token
         val sumupLogin = SumUpLogin.builder(affiliateKey).accessToken(token).build()
         SumUpAPI.openLoginActivity(activity, sumupLogin, SumUpTask.TOKEN_LOGIN.code)
     }
@@ -180,14 +166,8 @@ class SumupPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
 
     private fun checkout(
         payment: Map<String, Any?>,
-        paymentMethod: String,
-        info: Map<String, String>?,
-        result: Result
+        info: Map<String, String>?
     ) {
-        if (paymentMethod == "tapToPay") {
-            runTapToPayCheckout(payment, result)
-            return
-        }
         // Card reader checkout (existing flow; result delivered via onActivityResult)
         checkoutCardReader(payment, info)
     }
@@ -225,63 +205,6 @@ class SumupPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
         SumUpAPI.checkout(activity, payment.build(), 2)
     }
 
-    private fun runTapToPayCheckout(payment: Map<String, Any?>, result: Result) {
-        pluginScope.launch {
-            TapToPayRunner.runCheckout(
-                applicationContext = activity.applicationContext,
-                payment = payment,
-                accessToken = ttpAccessToken,
-                    affiliateKey = if (this@SumupPlugin::affiliateKey.isInitialized) this@SumupPlugin.affiliateKey else null,
-                onResult = { responseMap ->
-                    result.success(
-                        mapOf(
-                            "methodName" to "checkout",
-                            "status" to (responseMap["success"] == true),
-                            "message" to responseMap
-                        )
-                    )
-                }
-            )
-        }
-    }
-
-    private fun checkTapToPayAvailability(result: Result) {
-        pluginScope.launch {
-            val response = SumupPluginResponse("checkTapToPayAvailability")
-            try {
-                val (isAvailable, isActivated, errorMsg) = withContext(Dispatchers.Default) {
-                    TapToPayRunner.checkAvailability(
-                        applicationContext = activity.applicationContext,
-                        accessToken = ttpAccessToken
-                    )
-                }
-                response.message = mutableMapOf(
-                    "isAvailable" to isAvailable,
-                    "isActivated" to isActivated
-                )
-                if (errorMsg != null) response.message["error"] = errorMsg
-                response.status = isAvailable
-            } catch (e: Exception) {
-                Log.e(tag, "Tap-to-Pay availability check failed.", e)
-                response.message = mutableMapOf(
-                    "isAvailable" to false,
-                    "isActivated" to false,
-                    "error" to (e.message ?: "Unknown error")
-                )
-                response.status = false
-            }
-            result.success(response.toMap())
-        }
-    }
-
-    private fun presentTapToPayActivation(result: Result) {
-        // No activation UI on Android; TTP is ready after init with token.
-        val response = SumupPluginResponse("presentTapToPayActivation")
-        response.message = mutableMapOf("result" to "Not required on Android")
-        response.status = true
-        result.success(response.toMap())
-    }
-
     private fun isCheckoutInProgress(): SumUpPluginResponseWrapper {
         Log.d(tag, "Sumup plugin: is checkout in progress.")
         val currentOp = operations["isCheckoutInProgress"]!!
@@ -294,7 +217,7 @@ class SumupPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
         Log.d(tag, "Sumup plugin: is tip on card reader available.")
 
         val isAvailable = SumUpAPI.isTipOnCardReaderAvailable()
-        
+
         val currentOp = operations["isTipOnCardReaderAvailable"] ?: currentOperation!!
         currentOp.response.message = mutableMapOf("isAvailable" to isAvailable)
         currentOp.response.status = isAvailable
@@ -312,21 +235,13 @@ class SumupPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
 
     private fun logout(result: Result) {
         Log.d(tag, "Sumup plugin: logout.")
-        pluginScope.launch {
-            try {
-                TapToPayRunner.tearDown(activity.applicationContext)
-            } catch (e: Exception) {
-                Log.w(tag, "Tap-to-Pay session teardown failed.", e)
-            }
-            ttpAccessToken = null
-            SumUpAPI.logout()
-            val loggedIn = SumUpAPI.isLoggedIn()
-            val response = SumupPluginResponse("logout").apply {
-                message = mutableMapOf("isLoggedOut" to !loggedIn)
-                status = !loggedIn
-            }
-            result.success(response.toMap())
+        SumUpAPI.logout()
+        val loggedIn = SumUpAPI.isLoggedIn()
+        val response = SumupPluginResponse("logout").apply {
+            message = mutableMapOf("isLoggedOut" to !loggedIn)
+            status = !loggedIn
         }
+        result.success(response.toMap())
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {

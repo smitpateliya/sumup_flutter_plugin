@@ -1,14 +1,6 @@
 # Please add these rules to your existing keep rules in order to suppress warnings.
 # This is generated automatically by the Android Gradle plugin.
 
-# Keep Tap-to-Pay SDK (loaded via reflection; R8 would otherwise strip it in release)
--keep class com.sumup.taptopay.** { *; }
--keep class com.sumup.tap.topay.** { *; }
--keep class ca.amadis.agnos.** { *; }
-# SDK internal (e.g. ut.f4.init)
--keep class com.sumup.taptopay.ut.** { *; }
--keepclassmembers class com.sumup.taptopay.ut.** { *; }
-
 # SumUp/Flutter optional libs not in release classpath (Chucker, Play Core, analytics, OpenTelemetry)
 -dontwarn com.chuckerteam.chucker.**
 -dontwarn com.google.android.play.core.**

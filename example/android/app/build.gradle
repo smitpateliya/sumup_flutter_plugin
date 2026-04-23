@@ -43,7 +43,7 @@ android {
 
     defaultConfig {
         applicationId "io.purplesoft.sumup_example"
-        minSdkVersion 30  // required by Tap-to-Pay SDK
+        minSdkVersion 26
         targetSdkVersion 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
@@ -53,8 +53,6 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.debug
-            minifyEnabled false   // keep TTP SDK classes (no R8 stripping)
-            shrinkResources false
         }
     }
 
@@ -69,5 +67,4 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
-    implementation 'com.sumup.tap-to-pay:utopia-sdk:1.0.6'
 }

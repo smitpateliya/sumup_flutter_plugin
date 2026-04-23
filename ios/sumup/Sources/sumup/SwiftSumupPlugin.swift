@@ -66,38 +66,11 @@ public class SwiftSumupPlugin: NSObject, FlutterPlugin {
             pluginResponse.message = ["result": "ok"]
             result(pluginResponse.toDictionary())
             
-        case "checkTapToPayAvailability":
-            SumUpSDK.checkTapToPayAvailability { [weak self] isAvailable, isActivated, error in
-                guard let self = self else { return }
-                let pluginResponse = SumupPluginResponse(methodName: call.method, status: error == nil && isAvailable)
-                if let error = error {
-                    pluginResponse.message = ["isAvailable": false, "isActivated": false, "error": error.localizedDescription]
-                    pluginResponse.status = false
-                } else {
-                    pluginResponse.message = ["isAvailable": isAvailable, "isActivated": isActivated]
-                    pluginResponse.status = isAvailable
-                }
-                result(pluginResponse.toDictionary())
-            }
-
-        case "presentTapToPayActivation":
-            SumUpSDK.presentTapToPayActivation(from: topController(), animated: true) { [weak self] success, error in
-                guard let self = self else { return }
-                let pluginResponse = SumupPluginResponse(methodName: call.method, status: success)
-                pluginResponse.message = ["result": success ? "ok" : (error?.localizedDescription ?? "Activation failed")]
-                result(pluginResponse.toDictionary())
-            }
-
         case "checkout":
             let args = call.arguments as! [String: Any]
             let payment = args["payment"] as! [String: Any]
-            let paymentMethodStr = args["paymentMethod"] as? String ?? "cardReader"
 
             let request = CheckoutRequest(total: NSDecimalNumber(floatLiteral: payment["total"] as! Double), title: payment["title"] as? String, currencyCode: payment["currency"] as! String)
-
-            if paymentMethodStr == "tapToPay" {
-                request.paymentMethod = .tapToPay
-            }
 
             request.foreignTransactionID = payment["foreignTransactionId"] as? String
             request.tipAmount = NSDecimalNumber(floatLiteral: payment["tip"] as! Double)

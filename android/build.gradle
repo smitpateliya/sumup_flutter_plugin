@@ -25,17 +25,6 @@ rootProject.allprojects {
                 includeGroup 'net.sf.smc'
             }
         }
-        maven {
-            url = uri('https://tap-to-pay-sdk.fleet.live.sumup.net/')
-            content {
-                includeGroupByRegex 'com\\.sumup.*'
-                includeGroup 'ca.amadis.agnos'
-            }
-            credentials {
-                username = rootProject.findProperty('SUMUP_TTP_MAVEN_USERNAME')?.toString() ?: ''
-                password = rootProject.findProperty('SUMUP_TTP_MAVEN_PASSWORD')?.toString() ?: ''
-            }
-        }
     }
 }
 
@@ -57,7 +46,7 @@ android {
     }
     
     defaultConfig {
-        minSdkVersion 30  // Tap-to-Pay SDK requires 30+; card reader still works
+        minSdkVersion 26
         targetSdkVersion 35
         consumerProguardFiles 'consumer-rules.pro'
     }
@@ -76,5 +65,4 @@ dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
     implementation "com.google.android.gms:play-services-location:21.3.0"
     api 'com.sumup:merchant-sdk:6.0.0'
-    implementation 'com.sumup.tap-to-pay:utopia-sdk:1.0.6'
 }
